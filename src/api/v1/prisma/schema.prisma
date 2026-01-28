@@ -1,0 +1,501 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum user_type {
+  USER
+  ADMIN
+}
+
+enum Mute_duration {
+  EIGHT_HOURS
+  ONE_WEEK
+  ALWAYS
+}
+
+enum screen_name {
+  USER_REQUESTS
+  USER_INVITES
+  JOB
+  TRANSACTION_DEBIT
+  TRANSACTION_CREDIT
+}
+
+// user start
+model users {
+  id          String  @id @default(uuid())
+  referred_by String?
+
+  email                String?  @db.VarChar(255)
+  mute_notifications   Boolean? @default(false)
+  social_account_token String?  @db.VarChar(255)
+  is_email_verified    Boolean  @default(false)
+  is_phone_verified    Boolean  @default(false)
+  is_completed         Boolean  @default(false)
+  is_subscribed        Boolean  @default(false)
+  is_blocked           Boolean? @default(false)
+  is_approved          Boolean? @default(true)
+
+  user_type user_type?
+
+  user_secrets           user_secrets?
+  user_details           user_details?
+  user_sessions          user_sessions[]
+  help_and_feedback      help_and_feedback[] @relation("senders")
+  notification_receivers notifications[]     @relation("notification_receivers")
+  blocked_user           block_user[]        @relation("blocked_user")
+  blocked_by             block_user[]        @relation("blocked_by")
+
+  created_at       DateTime          @default(now()) @db.Timestamp(0)
+  updated_at       DateTime          @updatedAt
+  communities      Community[]
+  sentInvites      CommunityInvite[] @relation("SentInvites")
+  receivedInvites  CommunityInvite[] @relation("ReceivedInvites")
+  communityMembers CommunityMember[]
+  communityPosts   CommunityPost[]
+  postLikes        PostLike[]
+  postComments     PostComment[]
+  commentReplies   CommentReply[]
+  sessions         Session[]
+  sessionPractices SessionPractice[]
+  paymentCards     PaymentCard[]
+  referralCode     referal_code?
+  userSettings     user_settings?
+  referrerRewards  referral_reward[] @relation("ReferrerRewards")
+  referredRewards  referral_reward[] @relation("ReferredRewards")
+  report           Report[]
+}
+
+model user_details {
+  id      String @id @default(uuid())
+  user_id String @unique
+
+  full_name       String
+  last_name       String?
+  date_of_birth   DateTime? // Optional - kept for backward compatibility
+  min_age         Int? // Age range minimum (e.g., 40)
+  max_age         Int? // Age range maximum (e.g., 45)
+  gender          String
+  location        String?   @db.VarChar(255)
+  city            String?
+  state           String?
+  contact_email   String?
+  contact_phone   String?
+  profile_picture String?   @db.VarChar(255)
+  latitude        String?
+  longitude       String?
+  word_cue_number Int?      @default(2) // Word cue number setting
+  pause_duration  Int?      @default(2) // Pause duration in seconds
+
+  users users? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @updatedAt
+}
+
+model user_secrets {
+  id      String @id @default(uuid())
+  user_id String @unique
+
+  otp            String?  @db.VarChar(255)
+  password       String?  @db.VarChar(255)
+  otp_expiration DateTime @db.DateTime()
+
+  users users? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @updatedAt
+}
+
+model user_sessions {
+  id      String  @id @default(uuid())
+  user_id String?
+
+  fcm_token         String? @db.LongText
+  refresh_token     String  @unique @db.VarChar(255)
+  mute_notification Boolean @default(true)
+
+  users users? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @updatedAt
+}
+
+// chat and notifications start
+model notifications {
+  id String @id @default(uuid())
+
+  title        String?      @db.VarChar(255)
+  message      String?      @db.LongText
+  recipient_id String?
+  metadata     String?      @db.VarChar(255)
+  is_read      Boolean      @default(false)
+  is_admin     Boolean      @default(false)
+  screen_name  screen_name?
+
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @updatedAt
+
+  notification_receivers users? @relation(fields: [recipient_id], name: "notification_receivers", references: [id], onDelete: Cascade)
+}
+
+model block_user {
+  id              String  @id @default(uuid())
+  blocked_user_id String?
+  blocked_by_id   String?
+
+  blocked_user users? @relation(fields: [blocked_user_id], name: "blocked_user", references: [id], onDelete: Cascade)
+  blocked_by   users? @relation(fields: [blocked_by_id], name: "blocked_by", references: [id], onDelete: Cascade)
+
+  created_at DateTime  @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @updatedAt
+}
+
+// chat and notification end
+
+// public start
+model terms_and_conditions {
+  id String @id @default(uuid())
+
+  description String? @db.LongText
+
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @updatedAt
+}
+
+model privacy_policy {
+  id String @id @default(uuid())
+
+  description String? @db.LongText
+
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @updatedAt
+}
+
+model about_app {
+  id String @id @default(uuid())
+
+  description String? @db.LongText
+
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @updatedAt
+}
+
+model help_and_feedback {
+  id String @id @default(uuid())
+
+  subject   String? @db.VarChar(1000)
+  message   String? @db.LongText
+  sender_id String
+
+  help_and_feedback_images help_and_feedback_images[]
+  senders                  users                      @relation(fields: [sender_id], name: "senders", references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @updatedAt
+}
+
+model help_and_feedback_images {
+  id                   String @id @default(uuid())
+  help_and_feedback_id String
+
+  review_image String? @db.VarChar(255)
+
+  help_and_feedback help_and_feedback? @relation(fields: [help_and_feedback_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @updatedAt
+}
+
+//community
+enum CommunityPrivacy {
+  PUBLIC
+  PRIVATE
+}
+
+model Community {
+  id             String           @id @default(uuid())
+  user_id        String?
+  communityImg   String?
+  communityTitle String           @db.VarChar(255)
+  description    String           @db.LongText
+  communityRules String           @db.LongText
+  membersCount   Int              @default(0)
+  isApproved     Boolean          @default(false)
+  privacy        CommunityPrivacy @default(PUBLIC)
+
+  user    users?            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  posts   CommunityPost[]
+  members CommunityMember[]
+  invites CommunityInvite[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  reports   Report[]
+}
+
+enum InviteStatus {
+  PENDING
+  APPROVED
+  DECLINED
+}
+
+model CommunityInvite {
+  id           String       @id @default(uuid())
+  community_id String
+  sender_id    String? // jo invite bhej raha hai
+  receiver_id  String? // jo invite receive karega
+  status       InviteStatus @default(PENDING)
+  sender       users?       @relation("SentInvites", fields: [sender_id], references: [id], onDelete: Cascade)
+  receiver     users?       @relation("ReceivedInvites", fields: [receiver_id], references: [id], onDelete: Cascade)
+
+  community Community @relation(fields: [community_id], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum CommunityMemberStatus {
+  PENDING
+  APPROVED
+  DECLINED
+}
+
+model CommunityMember {
+  id           String                @id @default(uuid())
+  community_id String
+  user_id      String
+  status       CommunityMemberStatus @default(PENDING)
+  isApplied    Boolean?              @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  community Community? @relation(fields: [community_id], references: [id])
+  user      users?     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([community_id, user_id]) // <<< ADD THIS
+}
+
+model CommunityPost {
+  id           String  @id @default(uuid())
+  community_id String?
+  user_id      String?
+  description  String  @db.VarChar(255)
+  postImg      String?
+
+  community Community? @relation(fields: [community_id], references: [id])
+  user      users?     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  post_like    PostLike[]
+  post_comment PostComment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PostLike {
+  id                String  @id @default(uuid())
+  community_post_id String?
+  user_id           String?
+
+  user           users?         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  community_post CommunityPost? @relation(fields: [community_post_id], references: [id])
+
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @updatedAt
+}
+
+model PostComment {
+  id                String  @id @default(uuid())
+  community_post_id String?
+  user_id           String?
+
+  text String @db.VarChar(255)
+
+  user           users?         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  community_post CommunityPost? @relation(fields: [community_post_id], references: [id])
+  comment_reply  CommentReply[]
+
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @updatedAt
+}
+
+model CommentReply {
+  id              String @id @default(uuid())
+  post_comment_id String
+  user_id         String
+
+  text String @db.VarChar(255)
+
+  post_comment PostComment? @relation(fields: [post_comment_id], references: [id], onDelete: Cascade)
+  user         users?       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @updatedAt
+}
+
+// Session Module
+enum SessionPurpose {
+  SPIRITUAL_WRITINGS
+  MEMORIZE_PLAY_LINES
+  PREPARE_EXAMS
+  PRESENTATIONS_SPEAKING
+  POETRY_LITERATURE
+  OTHER
+}
+
+enum SessionInputMethod {
+  VOICE_RECORD
+  TYPE_PASTE
+}
+
+model Session {
+  id          String             @id @default(uuid())
+  user_id     String
+  title       String             @db.VarChar(255)
+  content     String             @db.LongText
+  purpose     SessionPurpose?
+  inputMethod SessionInputMethod @default(TYPE_PASTE)
+  wordCount   Int                @default(0)
+  isActive    Boolean            @default(true)
+
+  user             users?            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  sessionPractices SessionPractice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([user_id])
+  @@index([createdAt])
+}
+
+model SessionPractice {
+  id             String  @id @default(uuid())
+  session_id     String
+  user_id        String
+  duration       Int? // Duration in seconds
+  accuracy       Float? // Overall accuracy percentage
+  wordsRecalled  Int? // Number of words recalled correctly
+  promptsUsed    Int     @default(0) // Number of times user requested help
+  improvementTip String? @db.VarChar(500) // Tip for improvement
+
+  session Session? @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  user    users?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([session_id])
+  @@index([user_id])
+  @@index([createdAt])
+}
+
+// Payment Card Details
+model PaymentCard {
+  id             String  @id @default(uuid())
+  user_id        String
+  cardType       String? @db.VarChar(50) // PAYPAL, GOOGLE_PAY, APPLE_PAY, STRIPE, etc.
+  cardNumber     String? @db.VarChar(20) // Last 4 digits or masked number
+  cardholderName String? @db.VarChar(255)
+  expiryMonth    Int?
+  expiryYear     Int?
+  cvv            String? @db.VarChar(10) // Should be encrypted in production
+  brand          String? @db.VarChar(50) // VISA, MASTERCARD, AMEX, etc.
+  isDefault      Boolean @default(false)
+  stripeCardId   String? @db.VarChar(255) // Stripe payment method ID if using Stripe
+
+  user users? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([user_id])
+  @@index([createdAt])
+}
+
+// Referral Code
+model referal_code {
+  id      String @id @default(uuid())
+  user_id String @unique
+  code    String @unique @db.VarChar(50)
+
+  users users? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @updatedAt
+
+  @@index([user_id])
+  @@index([code])
+}
+
+// User Settings (for app preferences)
+model user_settings {
+  id                 String  @id @default(uuid())
+  user_id            String  @unique
+  notifications      Boolean @default(true) // Push notifications enabled/disabled
+  facebook_connected Boolean @default(false)
+  google_connected   Boolean @default(false)
+  apple_connected    Boolean @default(false)
+  facebook_token     String? @db.VarChar(255)
+  google_token       String? @db.VarChar(255)
+  apple_token        String? @db.VarChar(255)
+
+  users users? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @updatedAt
+
+  @@index([user_id])
+}
+
+// FAQ
+model faq {
+  id       String @id @default(uuid())
+  question String @db.VarChar(500)
+  answer   String @db.LongText
+  order    Int    @default(0) // For sorting
+
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @updatedAt
+
+  @@index([order])
+}
+
+// Referral Rewards Tracking
+model referral_reward {
+  id               String  @id @default(uuid())
+  referrer_id      String // User who referred
+  referred_user_id String? // User who was referred (null if pending)
+  referral_code    String  @db.VarChar(50)
+  reward_type      String? @db.VarChar(50) // AI_PROMPTS, PREMIUM_TRIAL_DAYS
+  reward_amount    Int? // Number of prompts or days
+  is_claimed       Boolean @default(false)
+  is_active        Boolean @default(true)
+
+  referrer users? @relation("ReferrerRewards", fields: [referrer_id], references: [id], onDelete: Cascade)
+  referred users? @relation("ReferredRewards", fields: [referred_user_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @updatedAt
+
+  @@index([referrer_id])
+  @@index([referred_user_id])
+  @@index([referral_code])
+}
+
+model Report {
+  id          String   @id @default(uuid())
+  communityId String
+  userId      String
+  reasons     String // JSON string me multiple reasons store karenge
+  createdAt   DateTime @default(now())
+
+  community Community @relation(fields: [communityId], references: [id])
+  user      users     @relation(fields: [userId], references: [id])
+}
