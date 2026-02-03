@@ -117,6 +117,14 @@ router.post(
 
 // ========== POST ROUTES ==========
 
+// Get Single Post (must be before /:communityId/posts so "posts" matches literally)
+router.get(
+  "/posts/:postId",
+  verify_token,
+  validate_request(validations.get_single_post_schema),
+  controller.get_single_post,
+);
+
 // Create Post
 router.post(
   "/:communityId/posts",
@@ -153,6 +161,14 @@ router.delete(
   controller.delete_post,
 );
 
+// Report Post
+router.post(
+  "/posts/:postId/report",
+  verify_token,
+  validate_request(validations.report_post_schema),
+  controller.report_post,
+);
+
 // Like/Unlike Post
 router.post(
   "/posts/:postId/like",
@@ -187,12 +203,12 @@ router.patch(
   controller.update_comment,
 );
 
-// Delete Comment
+// Delete Comment or Reply (unified – id = commentId or replyId, no type param)
 router.delete(
-  "/comments/:commentId",
+  "/comments/:id",
   verify_token,
-  validate_request(validations.delete_comment_schema),
-  controller.delete_comment,
+  validate_request(validations.delete_comment_or_reply_schema),
+  controller.delete_comment_or_reply,
 );
 
 // ========== COMMENT REPLY ROUTES ==========
@@ -220,16 +236,10 @@ router.patch(
   validate_request(validations.update_comment_reply_schema),
   controller.update_comment_reply,
 );
-
-// Delete Comment Reply
-router.delete(
-  "/replies/:replyId",
-  verify_token,
-  validate_request(validations.delete_comment_reply_schema),
-  controller.delete_comment_reply,
-);
 router.get("/users/get", verify_token, controller.get_all_users);
 router.post("/send-invite", verify_token, controller.invite_user);
+router.post("/handle-invite", verify_token, controller.handle_invite);
+
 router.get("/users/invite", verify_token, controller.get_user_invites);
 router.post(
   "/send-private-join",
@@ -240,6 +250,17 @@ router.get(
   "/get-private-join/:communityId",
   verify_token,
   controller.get_community_requests,
+);
+router.get(
+  "/:communityId/users",
+  verify_token,
+  controller.get_all_community_users,
+);
+
+router.delete(
+  "/:communityId/member/:memberId",
+  verify_token,
+  controller.remove_member,
 );
 
 module.exports = router;

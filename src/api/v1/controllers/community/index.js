@@ -2,6 +2,7 @@
 
 const CommunityService = require("@api/v1/services/community");
 const Responses = require("@constants/responses");
+const { log } = require("winston");
 
 const service = new CommunityService();
 const responses = new Responses();
@@ -298,13 +299,15 @@ class CommunityController {
     try {
       const { user } = req.user;
       const { communityId } = req.params;
-      const { description, postImg } = req.body;
+      const { description, postImg, isImageEdit } = req.body;
+      const imagePath = req.media?.postImg?.[0]?.path || postImg;
 
       const data = await service.create_post({
         communityId,
         user_id: user.id,
         description,
-        postImg: req.media?.postImg?.[0]?.path || postImg,
+        postImg: imagePath,
+        isImageEdit,
       });
 
       const response = responses.ok_response(data, "Post created successfully");
@@ -338,14 +341,33 @@ class CommunityController {
     }
   };
 
+  // Get Single Post
+  get_single_post = async (req, res, next) => {
+    try {
+      const { user } = req.user;
+      const { postId } = req.params;
+      const data = await service.get_single_post({
+        postId,
+        user_id: user.id,
+      });
+      const response = responses.ok_response(data, "Post fetched successfully");
+      return res.status(response.status.code).json(response);
+    } catch (error) {
+      next(error);
+    }
+  };
+
   // Update Post
   update_post = async (req, res, next) => {
     try {
       const { user } = req.user;
       const { postId } = req.params;
-      const updateData = { ...req.body };
+      const { isImageEdit, ...restBody } = req.body || {};
+      const updateData = { ...restBody };
 
-      if (req.media?.postImg?.[0]?.path) {
+      if (isImageEdit === true) {
+        updateData.postImg = null;
+      } else if (req.media?.postImg?.[0]?.path) {
         updateData.postImg = req.media.postImg[0].path;
       }
 
@@ -374,6 +396,26 @@ class CommunityController {
       });
 
       const response = responses.ok_response(data, "Post deleted successfully");
+      return res.status(response.status.code).json(response);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // Report Post
+  report_post = async (req, res, next) => {
+    try {
+      const { user } = req.user;
+      const { postId } = req.params;
+      const { reason } = req.body || {};
+
+      const data = await service.report_post({
+        postId,
+        user_id: user.id,
+        reason,
+      });
+
+      const response = responses.ok_response(data, "Post reported successfully");
       return res.status(response.status.code).json(response);
     } catch (error) {
       next(error);
@@ -429,11 +471,13 @@ class CommunityController {
   // Get Post Comments
   get_post_comments = async (req, res, next) => {
     try {
+      const { user } = req.user;
       const { postId } = req.params;
       const { page, limit } = req.query;
 
       const data = await service.get_post_comments({
         postId,
+        user_id: user.id,
         page: parseInt(page) || 1,
         limit: parseInt(limit) || 10,
       });
@@ -485,6 +529,27 @@ class CommunityController {
       const response = responses.ok_response(
         data,
         "Comment deleted successfully",
+      );
+      return res.status(response.status.code).json(response);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // Delete Comment or Reply (unified – id = commentId or replyId)
+  delete_comment_or_reply = async (req, res, next) => {
+    try {
+      const { user } = req.user;
+      const { id } = req.params;
+
+      const data = await service.delete_comment_or_reply({
+        id,
+        user_id: user.id,
+      });
+
+      const response = responses.ok_response(
+        data,
+        data.message || "Deleted successfully",
       );
       return res.status(response.status.code).json(response);
     } catch (error) {
@@ -681,6 +746,83 @@ class CommunityController {
       next(error);
     }
   };
+
+  handle_invite = async (req, res, next) => {
+    try {
+      const { user } = req.user; // logged-in user
+      // const { inviteId } = req.params;
+      const { action, inviteId } = req.body; // 'accept' or 'reject'
+
+      if (!["accept", "reject"].includes(action)) {
+        return res.status(400).json({
+          status: { code: 400, success: false },
+          message: "Invalid action. Must be 'accept' or 'reject'.",
+          data: null,
+        });
+      }
+
+      const data = await service.handle_invite({
+        inviteId,
+        user_id: user.id,
+        action,
+      });
+
+      const response = responses.ok_response(data, data.message);
+      return res.status(response.status.code).json(response);
+    } catch (error) {
+      next(error);
+    }
+  };
+  get_all_community_users = async (req, res, next) => {
+    try {
+      const { communityId } = req.params;
+      // const { search } = req.query;
+      const { user } = req.user;
+      console.log("userId: ", user);
+
+      const users = await service.get_all_community_member({
+        user_id: user.id,
+        // search,
+        communityId,
+      });
+
+      return res.status(200).json({
+        status: { code: 200, success: true },
+        data: users,
+        error: null,
+        message: "Users fetched successfully",
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+  remove_member = async (req, res, next) => {
+    try {
+      const { user } = req.user;
+      const { communityId, memberId } = req.params;
+
+      const data = await service.remove_community_member({
+        communityId,
+        user_id: user.id,
+        memberId,
+      });
+
+      return res.status(200).json({
+        status: { code: 200, success: true },
+        data,
+        message: "Member removed successfully",
+        error: null,
+      });
+    } catch (err) {
+      return res.status(err.status || 500).json({
+        status: { code: err.status || 500, success: false },
+        data: null,
+        message: err.message || "Something went wrong",
+        error: err,
+      });
+    }
+  };
+
 }
 
 module.exports = CommunityController;

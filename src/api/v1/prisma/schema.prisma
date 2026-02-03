@@ -60,6 +60,7 @@ model users {
   communityPosts   CommunityPost[]
   postLikes        PostLike[]
   postComments     PostComment[]
+  postReports      PostReport[]
   commentReplies   CommentReply[]
   sessions         Session[]
   sessionPractices SessionPractice[]
@@ -272,6 +273,7 @@ model CommunityMember {
   user_id      String
   status       CommunityMemberStatus @default(PENDING)
   isApplied    Boolean?              @default(true)
+  isInvited    Boolean               @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -286,7 +288,7 @@ model CommunityPost {
   id           String  @id @default(uuid())
   community_id String?
   user_id      String?
-  description  String  @db.VarChar(255)
+  description  String  @db.LongText
   postImg      String?
 
   community Community? @relation(fields: [community_id], references: [id])
@@ -294,9 +296,21 @@ model CommunityPost {
 
   post_like    PostLike[]
   post_comment PostComment[]
+  post_reports PostReport[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model PostReport {
+  id        String   @id @default(uuid())
+  post_id   String
+  user_id   String
+  reasons   String   // JSON string for multiple reasons
+  createdAt DateTime @default(now())
+
+  community_post CommunityPost? @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  user           users?         @relation(fields: [user_id], references: [id], onDelete: Cascade)
 }
 
 model PostLike {

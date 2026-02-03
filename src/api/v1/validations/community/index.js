@@ -142,8 +142,9 @@ class CommunitySchema {
       communityId: Joi.string().required(),
     }),
     body: Joi.object({
-      description: Joi.string().required(),
-      postImg: Joi.string().optional(),
+      description: Joi.string().max(10000).optional().allow("", null),
+      postImg: Joi.string().optional().allow("", null),
+      isImageEdit: Joi.boolean().optional(),
     }),
   });
 
@@ -159,6 +160,15 @@ class CommunitySchema {
     body: Joi.object({}).unknown(true).allow(null),
   });
 
+  // Get Single Post
+  get_single_post_schema = Joi.object({
+    query: Joi.object({}).unknown(true),
+    params: Joi.object({
+      postId: Joi.string().required(),
+    }),
+    body: Joi.object({}).unknown(true).allow(null),
+  });
+
   // Update Post
   update_post_schema = Joi.object({
     query: Joi.object({}),
@@ -168,6 +178,7 @@ class CommunitySchema {
     body: Joi.object({
       description: Joi.string().optional(),
       postImg: Joi.string().optional(),
+      isImageEdit: Joi.boolean().optional(),
     }),
   });
 
@@ -178,6 +189,20 @@ class CommunitySchema {
       postId: Joi.string().required(),
     }),
     body: Joi.object({}),
+  });
+
+  // Report Post
+  report_post_schema = Joi.object({
+    query: Joi.object({}).unknown(true),
+    params: Joi.object({
+      postId: Joi.string().required(),
+    }),
+    body: Joi.object({
+      reason: Joi.alternatives()
+        .try(Joi.string(), Joi.array().items(Joi.string()))
+        .optional()
+        .default(""),
+    }),
   });
 
   // Like/Unlike Post
@@ -232,6 +257,15 @@ class CommunitySchema {
     body: Joi.object({}),
   });
 
+  // Delete Comment or Reply (unified – id = commentId or replyId)
+  delete_comment_or_reply_schema = Joi.object({
+    query: Joi.object({}).unknown(true),
+    params: Joi.object({
+      id: Joi.string().required(),
+    }),
+    body: Joi.object({}).unknown(true).allow(null),
+  });
+
   // Create Comment Reply
   create_comment_reply_schema = Joi.object({
     query: Joi.object({}),
@@ -266,7 +300,7 @@ class CommunitySchema {
     }),
   });
 
-  // Delete Comment Reply
+  // Delete Comment Reply (kept for backward compatibility; prefer delete_comment_or_reply)
   delete_comment_reply_schema = Joi.object({
     query: Joi.object({}),
     params: Joi.object({
